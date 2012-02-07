@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# POST-COMMIT HOOK
+#
+
+REPOS="$1"
+REV="$2"
+HOOK_DIR="$REPOS/hooks"
+
+$HOOK_DIR/svn-watch.pl -r $2 $1

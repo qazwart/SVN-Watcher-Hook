@@ -1,0 +1,371 @@
+Note: You can generate this documentation with the following commands;
+
+* perldoc svn-watch.pl
+* pod2text svn-watch.pl > documentation.txt  #Text Documentation
+* pod2html svn-watch.pl > svn-watch.html     #HTML Documentation
+
+========================================================================
+
+NAME
+    svn-watch.pl
+
+SYNOPSIS
+        svn-watch.pl -r <rev> [-directory <dir>] [-suffix <suffix>] \
+            [-domain <domain>] [-smtphost <host>] [-message <message>] \
+            [-sender <sender>] [-svnlook <svnlook>] [-subject <subject>] \
+            [-debug <debuglevel>] [-url <url>] [-noemail] \
+            [-smtpuser <host> -smtppassword <passwd>] <repos>
+    or
+        svn-watch.pl -help
+
+    or svn-watch.pl -options
+
+DESCRIPTION
+    This program implements watchlists in Subversion. A watchlist is a list
+    of files that a particular user would be notified on if changes occur in
+    a file that user was watching. Although there are many similar programs
+    like this for Subversion, most require access to the Subversion server
+    to set, so users are unable to set their own watch lists.
+
+    This program, however, allows users of Subversion to set their own watch
+    lists since the watch list is actually stored in the Subversion
+    repository itself.
+
+    In the user's watchlist, the user specifies the various email addresses
+    where notifications are sent when a file they were watching was
+    modified. Users are allowed to specify multiple email addresses, and the
+    program can be configured to automatically email the user at a default
+    email address if the user didn't specify one. The default email address
+    is set to the user's Subversion account name at the default domain
+    provided when executing this program.
+
+    Users can specify the files thwy are watching using Ant globbing (which
+    has very straight forward syntax) or Perl regular expressions (which are
+    more powerful, but the syntax is trickier).
+
+INSTALLATION
+    This program operates as a Subversion post-commit trigger and is
+    automatically executed after each revision.
+
+  REQUIREMENTS
+    *   Perl 5.7 or later.
+
+    *   Mail::Sendmail (optional). This is an optional Perl module to
+        install. It's very old, but straightforward and usually works
+        without too many issues. You can use the Perl CPAN utility to
+        install this module.
+
+        If this module is not installed, this program will automatically use
+        the Net::SMTP module which is a standard Perl module, so it doesn't
+        have to be installed. Unfortunately, this module sometimes fails and
+        crashes the post-commit process leaving the Subversion client
+        confused. Still, almost all sites have successfully used this
+        program without installing Mail::Sendmail.
+
+  WINDOWS
+    Copy this program into your Subversion repository's hook directory. Copy
+    or rename the post-commit.tmpl script to post-commit.bat. Modify the
+    post-commit.bat file to execute this script. The PATH environment will
+    not be set when the hook executes, so you need to include both the path
+    to your Perl interpreter and to this program:
+
+        set REV=%1
+        set REPOS=%2
+        C:\Perl\bin\perl %REPOS%\hooks\svn-watch.pl -r %REV% %REPOS%
+
+  UNIX, LINUX, MAC OS X, AND OTHER REAL OPERATING SYSTEMS
+    Copy this program into your Subversion repository's hook directory. Copy
+    or rename the post-commit.tmpl script to post-commit. Modify the
+    post-commit script to execute this script. The PATH environment will be
+    set to the default "/bin:/usr/bin", so if your Perl interpreter is
+    located in "/usr/local/bin" or some other non-standard place, you'll
+    need to put the path to your Perl's interpreter and the perl interpreter
+    in the script:
+
+        REV=$1
+        REPOS=$2
+
+        # If you have Perl located in F</usr/bin> or F</bin>
+
+        $REPOS/hooks/svn-watch.pl -r $REV $REPOS
+
+        # If you have Perl in a funky location
+
+        /usr/local/bin/perl5.8 $REPOS/hooks/svn-watch.pl -r $REV $REPOS
+
+    path to your Perl interpreter and to this program:
+
+  DIRECTIONS
+    The default location for the watch files is in the root of the
+    repository under a directory called /watchers. This can be modified by
+    using the command line parameters. However, you shouldn't put this file
+    in under the trunk, branches, or tags directory, nor should it be placed
+    in a module sub-directory.
+
+    The user's watch file will be the user's Subversion account name
+    followed by a suffix. The default suffix is .cfg, but again the suffix
+    can be changed by the command line parameters. You can use the
+    pre-commit-kitchen-sink-hook.pl program (also available from DaveCo
+    Software and Bait Shoppe, LLC) to prevent users from editing other
+    users' watch files.
+
+WATCH FILE LAYOUT
+    Each line in the Watchfile is one of six formats. (There are three line
+    types and each has a synonym). Any other line not in one of these
+    formats is ignored.
+
+    * "email = "*<User's Email Address>*
+
+    * "mail = "*<User's Email Address>*
+
+    * "file = "*<Ant's Glob Description of the File to Watch>*
+
+    * "glob = "*<Ant's Glob Description of the File to Watch>*
+
+    * "match = "*<Perl Regular Expression fo the File to Watch>*
+
+    * "regex = "*<Perl Regular Expression fo the File to Watch>*
+
+    The line type at the beginning of the line is case insensitive. All
+    white space at the beginning and end of the line is also ignored as well
+    as the white space around the equals sign. All of the following lines do
+    the same thing:
+
+        email = bob@mycompany.com
+        email=bob@mycompany.com
+        EMAIL = bob@mycompany.com
+        EmAiL = bob@mycompany.com
+        EmAiL=     bob@mycompany.com
+
+    The three different types of lines are:
+
+    email or mail:
+        The email address the notification is sent to. Users can have more
+        than one email line, and a notification message will be sent to all
+        of them.
+
+    file or glob:
+        Specifies a file to be watched. This specification is in Ant's
+        globbing syntax which is easier and more familar than regular
+        expressions. The globbing syntax has three parts.
+
+        *    A single astrisk represents zero or more characters, but only
+             with in the directory. Thus, if you specify:
+
+                 file = /projects/myproj/*/*.java
+
+             A watch would be placed on all Java files in the directory
+             "/project/myproj/foo/" and in "/project/myproj/bar", but not
+             Java files in "/project/myproj/foo/bar" since only the
+             directories right below "/project/myproj" were specified and
+             not any of their subdirectories.
+
+        ?    A question mark represents a single character. So
+             "/project/myproj/foo/apple?.java" would place a watch on
+             "/project/myproj/foo/apple1.java" and
+             "/project/myproj/foo/apple2.java", but not
+             "/project/myproj/foo/apple.java" or
+             "/project/myproj/foo/apple12.java".
+
+        **   A double astrisk represents any number of characters in any
+             directory or subdirectory tree. "/project/myproj/foo/**/*.java"
+             would place a watch on any Jaa file under the
+             "/project/myproj/foo" directory tree.
+
+    match or regex:
+        This specifies a match using the full set of Perl regular
+        expressions. Perl regular expressions are more complex than simple
+        globs, but gives the user much more power over matching file names.
+        For example, a single Perl regular expression can match multiple
+        suffixes in a file.
+
+        Regular expressions do not require slashes before and after, and
+        should not be in quotes. Regular expressions are not anchored, so
+        "foo" would match any occurance of "foo" in the file name. You can
+        use the standard Perl anchors of "^" and "$" to anchor a regular
+        expression at teh beginning or end of a line.
+
+        For more information on Perl regular expressions, type in the
+        following command:
+
+            $ perldoc perlre
+
+    NOTE:
+        All glob expressions are anchored to the root of the repository
+        direcotry. And, the root of the directory tree starts with a slash.
+        Thus, merely specifying "myproj/*.java" will not put a watch on any
+        file. However, users can specify a double at the beginning of their
+        file specification to remove this anchoring. Thus
+        "**/myproj/**/*.java" would place a watch on any Java file under a
+        directory "myproj" located anywhere in the repository.
+
+  WATCH FILE LINE EXAMPLES
+    *   Send an email to Bob's Acme's email address
+
+            mail = bob@acme.com
+
+    *   Send an email to Bob's Cellphone pager
+
+            email = 2125554567@verizon.net
+
+    *   Let me know when any build.xml file is modified
+
+            file = **/build.xml
+
+    *   Let me know when someone modifies any help files
+
+            glob = **/main/src/**/help/**
+
+    *   Let me know if someone modifies an shell script or Perl script
+
+            match = \.(pl|sh|ksh|bash)$
+
+    *   Let me know if someone modifies any build.xml file I suspect that
+        some are in the format build-*.xml or build.*.xml:
+
+            regex = build(-\.)\w+\.xml$
+
+OPTIONS
+    -r:         REQUIRED This is the revision number used for the
+                post-commit trigger and is passed as the second command line
+                argument to the post-commit trigger.
+
+    -directory: Name of the directory in the repository where the Watch
+                files are stored. Only files stored directly under this
+                directory will be examined as watchfiles files in
+                sub-directories will be ignored.
+
+                The default is "/watchers".
+
+    -suffix:    The suffix for watch files. Watch files are the same name as
+                the subversion user ID plus the suffix. If a watch file does
+                not have this suffix, it will be ignored. Suffixes are added
+                to the file after a period, so you don't have to specify the
+                beginning period. However, if you do, it will be ignored.
+
+                The default is "cfg"
+
+                For example, if both the default for "-directory" and
+                "-suffix" are kept, user "bob" would have the watch file
+                "/watchfiles/bob.cfg".
+
+    -domain:    The domain to add to user names if the user does not specify
+                an email address for example, if the domain is set to
+                "mycompany.com" and user *bob* is suppose to receive a
+                notification message, the message will be sent to
+                "bob@mycompany.com".
+
+    -smtphost:  The SMTP host used for sending email messages.
+
+    -message:   This is a text file that contains the message to email to
+                users when a file they are watching is changed. Certain
+                keywords are replaced with values taken from the
+                notificaiton list. If you use your own message, you can
+                include these special keywords in your own message.
+
+                %AUTHOR%       The name of the user who did the commit.
+
+                %CHANGED%      A list of all the files changed that the user
+                               is interested in. This listing is one per
+                               line.
+
+                %COMMIT%       The commit message made by the author at the
+                               time of the commit. NOTE: The commit message
+                               can be more than one line long. Remember that
+                               when you format your notification message.
+
+                %EMAIL%        The email address of the user.
+
+                %REVISION%     The revision of the Subverision repository.
+
+                %URL%          The URL used by the users to access the
+                               Subversion repository.
+
+                %USER%         The Subversion user ID of the user getting
+                               the notificaiton message.
+
+                %WATCHFILE%    The name of the user's watchfile including
+                               its full path.
+
+    -sender     The email address you want to appear as the sender of the
+                notification message. Note this will be the address used if
+                a user replies to their notification message.
+
+                Default can be seen via "svn-watch.pl -help".
+
+    -svnlook:   The location of the "svnlook" command.
+
+                The default is "/usr/bin/svnlook".
+
+    -debug      This is the debug level. The higher the number, the more
+                debugging messages.
+
+                The default is "0" which means no debugging informtion.
+
+    -url        This is the URL that the users normally use to access the
+                Subversion repository. This is mainly used for the
+                notification email message sent to the users.
+
+    -smtpuser -smtppassword
+                These two items are required if your SMTP server uses
+                authorization. The "-smtpuser" is the user, the
+                "-smtppassword)" is the password to use, and the "-smtpauth"
+                is the authorization type needed for sending the user name
+                and password.
+
+    -subject    This is the subject line that will appear on emails sent out
+                ot watchers. Certain keywords are replaced with values taken
+                from the notificaiton list. If you use your own subject
+                line, you can include these special keywords in your own
+                subject line.
+
+    -noemail    This option prevents users from defining their own email
+                addresses. Apparently, someone at one of the sites that used
+                this couldn't understand the concept that he wasn't suppose
+                to tell other peoplw what files they were suppose to watch.
+                If used, only the default email address will be used.
+
+    *<repos>*   REQUIRED: The path to the root of the Subversion repository.
+
+    -help       Displays a brief help message just showing the command line
+                options.
+
+    -options    Displays indepth help message showing the command line and
+                description of all the options.
+
+BUGS
+    *   There is nothing preventing a user from entering someone else's
+        email address, and there's no easy way to catch this. We simply are
+        trusting everyone to act professionally.
+
+    *   This program doesn't show the diff between the files like
+        "svnnotify" does.
+
+    *   It would be nice if this program could interface somehow with
+        svnnotify. An earlier version attempted to, but it never really
+        worked as advertised, and made the code more difficult to read. The
+        whole thing was removed in a later version.
+
+SEE ALSO
+        svnnotify(1)
+
+AUTHOR
+    David Weintraub <david@weintraub.name>
+
+COPYRIGHT
+    Copyright (c) 2011 by David Weintraub. All rights reserved. This program
+    is covered by the open source BMAB license.
+
+    The BMAB (Buy me a beer) license allows you to use all code for whatever
+    reason you want with these three caveats:
+
+    1.  If you make any modifications in the code, please consider sending
+        them to me, so I can put them into my code.
+
+    2.  Give me attribution and credit on this program.
+
+    3.  If you're in town, buy me a beer. Or, a cup of coffee which is what
+        I'd prefer. Or, if you're feeling really spendthrify, you can buy me
+        lunch. I promise to eat with my mouth closed and to use a napkin
+        instead of my sleeves.
+
