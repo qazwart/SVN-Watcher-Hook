@@ -13,16 +13,16 @@ use Pod::Usage;
 sub debug;
 
 use constant {
-    DIRECTORY_DEFAULT => "watchers",
-    SUFFIX_DEFAULT    => "cfg",
-    DOMAIN_DEFAULT    => "mfxfairfax.com",
-    SMTP_HOST_DEFAULT => "MFXRKEDMA01.mfxservices.intr",
-    SENDER_DEFAULT    => 'MFXCMJira@mfxfairfax.com',
-    SVNLOOK_DEFAULT   => "/usr/bin/svnlook",
-    DEBUG_DEFAULT     => "0",
-    URL_DEFAULT       => "http://mfrklxmfxcmp01.mfxservices.intr/src",
-    SUBJECT_DEFAULT   => "[SVN-WATCH] Revision %REVISION%: Change in "
-      . "Subversion repository",
+    DIRECTORY_DEFAULT => 'watchers',
+    SUFFIX_DEFAULT    => 'cfg',
+    DOMAIN_DEFAULT    => 'travelclick.com',
+    SMTP_HOST_DEFAULT => 'webmail.travelclick.com',
+    SENDER_DEFAULT    => 'svnwatch@travelclick.com',
+    SVNLOOK_DEFAULT   => '/usr/local/bin/svnlook',
+    DEBUG_DEFAULT     => '0',
+    URL_DEFAULT       => 'http://svn.travelclick.net/svn/TravelClick',
+    SUBJECT_DEFAULT   => '[SVN-WATCH] Revision %REVISION%: Change in '
+      . 'Subversion repository',
 };
 
 use constant {
@@ -158,8 +158,7 @@ $watch->Smtp_Password($smtp_password) if ( defined $smtp_password );
 ########################################################################
 # GATHER WATCHFILE NAMES AND USERS
 #
-foreach
-  my $watch_file (qx($svnlook_cmd tree -N "$repository" "$watch_file_dir"))
+for my $watch_file (qx($svnlook_cmd tree -N "$repository" "$watch_file_dir"))
 {
     chomp($watch_file);
     $watch_file =~ s/^\s+//;
@@ -180,11 +179,10 @@ if ( not defined $watch->Watcher ) {
     exit 0;    #No watchers Defined. No need to do any further processing
 }
 
-foreach my $watcher ( $watch->Watcher ) {
+for my $watcher ( $watch->Watcher ) {
     my $watch_file = $watcher->Watch_File;
     my $repository = $watch->Repository;
-    foreach
-      my $line (qx[$svnlook_cmd cat $repository "$watch_file_dir/$watch_file"])
+    for my $line (qx[$svnlook_cmd cat $repository "$watch_file_dir/$watch_file"])
     {
         chomp $line;
         my ( $type, $value ) = process_line($line);
@@ -208,9 +206,9 @@ foreach my $watcher ( $watch->Watcher ) {
 ########################################################################
 # NOW FOR EACH CHANGE, SEE IF A USER IS WATCHING FOR IT
 #
-foreach my $line (qx/$svnlook_cmd changed -r $revision "$repository"/) {
+for my $line (qx/$svnlook_cmd changed -r $revision "$repository"/) {
     chomp($line);
-    foreach my $watcher ( $watch->Watcher ) {
+    for my $watcher ( $watch->Watcher ) {
         my ( $change_type, $file_changed ) = split( /\s+/, $line, 2 );
         if ( $watcher->Find($file_changed) ) {
             $watcher->Notify($line);
@@ -224,7 +222,7 @@ foreach my $line (qx/$svnlook_cmd changed -r $revision "$repository"/) {
 ########################################################################
 # SEND OUT THE NOTIFICATIONS
 #
-foreach my $watcher ( $watch->Watcher ) {
+for my $watcher ( $watch->Watcher ) {
     if ( $watcher->Notify ) {
         $watch->Send_Email($watcher);
     }
@@ -315,7 +313,7 @@ sub glob2regex {
     my $regex            = undef;
     my $previous_astrisk = undef;
 
-    foreach my $letter ( split( //, $glob ) ) {
+    for my $letter ( split( //, $glob ) ) {
 
         #
         #    ####Check if previous letter was astrisk
@@ -729,7 +727,8 @@ sub Send_Email {
     #
     # Create a Default Email if Watcher doesn't have one
     #
-    if ( not $watcher->Email_List and $watch->Default_Domain ) {
+    my @addresses = $watcher->Email_List;
+    if ( not @addresses and $watch->Default_Domain ) {
         $watcher->Email_List( $watcher->User . '@' . $watch->Default_Domain );
     }
 
@@ -746,7 +745,7 @@ sub Send_Email {
     # Mail::Sendmail is installed: Use that
     #
 
-    foreach my $email ( $watcher->Email_List ) {
+    for my $email ( $watcher->Email_List ) {
         my $message = $watch->Munge_Message( $watcher, $email );
         my $subject =
           $watch->Munge_Message( $watcher, $email, $watch->Subject );
@@ -768,7 +767,7 @@ sub _Send_Email_Net_SMTP {
     my $watch   = shift;
     my $watcher = shift;
 
-    foreach my $email ( $watcher->Email_List ) {
+    for my $email ( $watcher->Email_List ) {
 
         my $smtp = Net::SMTP->new(
             Host  => $watch->Smtp_Host,
@@ -999,7 +998,7 @@ sub Find {
     my $file = shift;
 
     $file = "/" . $file if $file =~ m(^/);
-    foreach my $watch_regex ( $self->Watch_List ) {
+    for my $watch_regex ( $self->Watch_List ) {
         if ( $file =~ /$watch_regex/ ) {
             return $watch_regex;
         }
